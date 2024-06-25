@@ -20,11 +20,11 @@ kotlin {
     jvmToolchain(21)
 }
 
-task fatJar(type: Jar) {
+tasks.register('fatJar', Jar) {
     manifest {
-        attributes 'Main-Class': 'Main'
+        attributes 'Main-Class': 'com.carlos.MainKt'
     }
     duplicatesStrategy = DuplicatesStrategy.INCLUDE
-    from { configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it)}}
-        with jar
+    from { configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) } }
+    with jar
 }
