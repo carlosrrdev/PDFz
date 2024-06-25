@@ -1,38 +1,68 @@
 package com.carlos
 
 import org.apache.pdfbox.pdmodel.PDDocument
-import org.apache.pdfbox.text.PDFTextStripper
+import org.apache.pdfbox.rendering.PDFRenderer
+import javax.imageio.ImageIO
 import java.io.File
 import java.io.IOException
 
-fun searchInPDFs(dirPath: String, searchTerm: String) {
-    val dir = File(dirPath)
-    val pdfFiles = dir.listFiles { _, name -> name.endsWith(".pdf") }
+fun extractTextFromPDF(pdfPath: String, keyword: String) {
+    val doc = PDDocument.load(File(pdfPath))
+    val renderer = PDFRenderer(doc)
+    var keywordFound = false
 
-    pdfFiles?.forEach { file ->
-        try {
-            PDDocument.load(file).use { document ->
-                val pdfStripper = PDFTextStripper()
-                val text = pdfStripper.getText(document)
-                if (searchTerm in text) {
-                    println("Found '$searchTerm' in '$file.name'")
-                }
-            }
-        } catch (e: IOException) {
-            println("Error processing PDF: ${e.message} in ${file.name}")
+    for (i in 0 until doc.numberOfPages) {
+
+        // Convert each page in the PDF into images
+        val image = renderer.renderImageWithDPI(i, 300F)
+        val tempImage = File("page$i.png")
+        ImageIO.write(image, "PNG", tempImage)
+
+        val text = runTess(tempImage.absolutePath)
+        if(keyword in text) {
+            keywordFound = true
         }
+        tempImage.delete() // Delete temporary file
+    }
+
+    doc.close()
+    if(keywordFound) {
+        println("Keyword '$keyword' found in: $pdfPath")
     }
 }
 
-fun main() {
-    print("Enter path to directory: ")
-    val dirPath: String = readlnOrNull() ?: ""
-    print("Enter search term: ")
-    val searchTerm: String = readlnOrNull() ?: ""
+fun runTess(imagePath: String): String {
+    try {
+        val processBuilder = ProcessBuilder("tesseract", imagePath, "stdout")
+        processBuilder.redirectErrorStream(true)
 
-    if (dirPath.isEmpty() || searchTerm.isEmpty()) {
-        return
-    } else {
-        searchInPDFs(dirPath, searchTerm)
+        val process = processBuilder.start()
+        process.waitFor()
+
+        return process.inputStream.bufferedReader().readText()
+    } catch(e: IOException) {
+        e.printStackTrace()
+    } catch(e: InterruptedException) {
+        e.printStackTrace()
     }
+    return "Error processing image with Tesseract"
+}
+
+fun processDirectory(directoryPath: String, keyword: String) {
+    val directory = File(directoryPath)
+    val pdfFiles = directory.listFiles { _, name -> name.endsWith(".pdf", ignoreCase = true) }
+
+    pdfFiles?.forEach { file ->
+        extractTextFromPDF(file.absolutePath, keyword)
+    } ?: println("No PDF files found in $directoryPath")
+}
+
+fun main() {
+    println("Enter the path to the directory containing PDF files:")
+    val directoryPath = readlnOrNull() ?: return println("No input provided for directory path.")
+
+    println("Enter the keyword to search for in the PDF files:")
+    val keyword = readlnOrNull() ?: return println("No input provided for keyword.")
+
+    processDirectory(directoryPath, keyword)
 }
