@@ -10,7 +10,7 @@ repositories {
 }
 
 dependencies {
-    testImplementation 'org.jetbrains.kotlin:kotlin-test'
+    implementation "org.apache.pdfbox:pdfbox:2.0.24"
 }
 
 test {
@@ -18,4 +18,13 @@ test {
 }
 kotlin {
     jvmToolchain(21)
+}
+
+task fatJar(type: Jar) {
+    manifest {
+        attributes 'Main-Class': 'Main'
+    }
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
+    from { configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it)}}
+        with jar
 }
