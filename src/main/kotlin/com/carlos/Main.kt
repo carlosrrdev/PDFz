@@ -8,26 +8,30 @@ import java.io.IOException
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
-fun extractTextFromPDF(pdfPath: String, keyword: String) {
+fun extractTextFromPDF(pdfPath: String, keyword: String): Boolean {
     val doc = PDDocument.load(File(pdfPath))
     val renderer = PDFRenderer(doc)
 
-    for (i in 0 until doc.numberOfPages) {
+    try {
+        for (i in 0 until doc.numberOfPages) {
 
-        // Convert each page in the PDF into images
-        val image = renderer.renderImageWithDPI(i, 300F)
-        val tempImage = File("page$i.png")
-        ImageIO.write(image, "PNG", tempImage)
+            // Convert each page in the PDF into images
+            val image = renderer.renderImageWithDPI(i, 300F)
+            val tempImage = File("page$i.png")
+            ImageIO.write(image, "PNG", tempImage)
 
-        val text = runTess(tempImage.absolutePath)
-        tempImage.delete() // Delete temporary file
+            val text = runTess(tempImage.absolutePath)
+            tempImage.delete() // Delete temporary file
 
-        if(keyword in text) {
-            println("Keyword: $keyword found in: $pdfPath" )
-            break
+            if(keyword in text) {
+                println("Keyword: $keyword found in: $pdfPath" )
+                return true
+            }
         }
-    }
-    doc.close()
+     } finally {
+        doc.close()
+     }
+    return false
 }
 
 fun runTess(imagePath: String): String {
@@ -65,10 +69,26 @@ fun runTess(imagePath: String): String {
 fun processDirectory(directoryPath: String, keyword: String) {
     val directory = File(directoryPath)
     val pdfFiles = directory.listFiles { _, name -> name.endsWith(".pdf", ignoreCase = true) }
+    val threads = Runtime.getRuntime().availableProcessors()
+    val executor = Executors.newFixedThreadPool(threads)
 
     pdfFiles?.forEach { file ->
-        extractTextFromPDF(file.absolutePath, keyword)
-    } ?: println("No PDF files found in $directoryPath")
+        executor.submit {
+            if(extractTextFromPDF(file.absolutePath, keyword)) {
+                println("Keyword: $keyword found in: ${file.absolutePath}")
+            }
+        }
+    }
+
+    executor.shutdown()
+    try {
+        if (!executor.awaitTermination(30, TimeUnit.MINUTES)) {
+            executor.shutdownNow()
+        }
+    } catch(e: InterruptedException) {
+        executor.shutdownNow()
+        Thread.currentThread().interrupt()
+    }
 }
 
 fun main() {
@@ -78,7 +98,7 @@ fun main() {
     println("Enter the keyword to search for in the PDF files:")
     val keyword = readlnOrNull() ?: return println("No input provided for keyword.")
 
-    val spinner = Spinner("Processing PDFS")
+    val spinner = Spinner("Processing PDFS:")
     spinner.start()
 
     try {
