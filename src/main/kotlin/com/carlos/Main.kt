@@ -5,6 +5,8 @@ import org.apache.pdfbox.rendering.PDFRenderer
 import javax.imageio.ImageIO
 import java.io.File
 import java.io.IOException
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 fun extractTextFromPDF(pdfPath: String, keyword: String) {
     val doc = PDDocument.load(File(pdfPath))
@@ -32,20 +34,35 @@ fun extractTextFromPDF(pdfPath: String, keyword: String) {
 }
 
 fun runTess(imagePath: String): String {
-    try {
-        val processBuilder = ProcessBuilder("tesseract", imagePath, "stdout")
-        processBuilder.redirectErrorStream(true)
+  val executor = Executors.newSingleThreadExecutor()
+    val future = executor.submit<String> {
+        try {
+            val processBuilder = ProcessBuilder("tesseract", imagePath, "stdout")
+            processBuilder.redirectErrorStream(true)
 
-        val process = processBuilder.start()
-        process.waitFor()
-
-        return process.inputStream.bufferedReader().readText()
-    } catch(e: IOException) {
-        e.printStackTrace()
-    } catch(e: InterruptedException) {
-        e.printStackTrace()
+            val process = processBuilder.start()
+            if(!process.waitFor(1, TimeUnit.MINUTES)) {
+                process.destroy()
+                throw RuntimeException("Process timeout: OCR process was terminated due to exceeding time limit")
+            }
+            process.inputStream.bufferedReader().readText()
+        } catch(e: IOException) {
+            e.printStackTrace()
+            "Error processing image with Tesseract"
+        } catch(e: InterruptedException) {
+            e.printStackTrace()
+            "Error processing image with Tesseract"
+        }
     }
-    return "Error processing image with Tesseract"
+
+    try {
+        return future.get(1, TimeUnit.MINUTES)
+    } catch(e: Exception) {
+        future.cancel(true)
+        return "OCR process canceled due to timeout"
+    } finally {
+        executor.shutdownNow()
+    }
 }
 
 fun processDirectory(directoryPath: String, keyword: String) {
