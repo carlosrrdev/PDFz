@@ -8,12 +8,23 @@ import java.io.IOException
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
+object AnsiColor {
+    const val RESET = "\u001B[0m"
+    const val RED = "\u001B[31m"
+    const val GREEN = "\u001B[32m"
+    const val YELLOW = "\u001B[33m"
+    const val BLUE = "\u001B[34m"
+    const val PURPLE = "\u001B[35m"
+    const val CYAN = "\u001B[36m"
+    const val WHITE = "\u001B[37m"
+}
+
 fun extractTextFromPDF(pdfPath: String, keyword: String): Boolean {
     val doc = PDDocument.load(File(pdfPath))
     val renderer = PDFRenderer(doc)
 
-    try {
-        for (i in 0 until doc.numberOfPages) {
+    doc.use { document ->
+        for (i in 0 until document.numberOfPages) {
 
             // Convert each page in the PDF into images
             val image = renderer.renderImageWithDPI(i, 300F)
@@ -24,13 +35,10 @@ fun extractTextFromPDF(pdfPath: String, keyword: String): Boolean {
             tempImage.delete() // Delete temporary file
 
             if(keyword in text) {
-                println("Keyword: $keyword found in: $pdfPath" )
                 return true
             }
         }
-     } finally {
-        doc.close()
-     }
+    }
     return false
 }
 
@@ -82,7 +90,7 @@ fun processDirectory(directoryPath: String, keyword: String) {
     pdfFiles.forEach { file ->
         executor.submit {
             if(extractTextFromPDF(file.absolutePath, keyword)) {
-                println("Keyword: $keyword found in: ${file.absolutePath}")
+                println("\n${AnsiColor.GREEN}Keyword: $keyword found in: ${file.absolutePath}${AnsiColor.RESET}")
             }
         }
     }
