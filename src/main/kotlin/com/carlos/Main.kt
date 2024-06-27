@@ -69,10 +69,17 @@ fun runTess(imagePath: String): String {
 fun processDirectory(directoryPath: String, keyword: String) {
     val directory = File(directoryPath)
     val pdfFiles = directory.listFiles { _, name -> name.endsWith(".pdf", ignoreCase = true) }
-    val threads = Runtime.getRuntime().availableProcessors()
-    val executor = Executors.newFixedThreadPool(threads)
 
-    pdfFiles?.forEach { file ->
+    if(pdfFiles.isNullOrEmpty()) {
+        println("No PDF files found")
+        return;
+    }
+    val maxThreads = 4
+    val threads = Runtime.getRuntime().availableProcessors()
+    val threadCount = minOf(maxThreads, threads)
+    val executor = Executors.newFixedThreadPool(threadCount)
+
+    pdfFiles.forEach { file ->
         executor.submit {
             if(extractTextFromPDF(file.absolutePath, keyword)) {
                 println("Keyword: $keyword found in: ${file.absolutePath}")
