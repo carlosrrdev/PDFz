@@ -11,7 +11,6 @@ import java.util.concurrent.TimeUnit
 fun extractTextFromPDF(pdfPath: String, keyword: String) {
     val doc = PDDocument.load(File(pdfPath))
     val renderer = PDFRenderer(doc)
-    var keywordFound = false
 
     for (i in 0 until doc.numberOfPages) {
 
@@ -19,18 +18,15 @@ fun extractTextFromPDF(pdfPath: String, keyword: String) {
         val image = renderer.renderImageWithDPI(i, 300F)
         val tempImage = File("page$i.png")
         ImageIO.write(image, "PNG", tempImage)
+        tempImage.delete() // Delete temporary file
 
         val text = runTess(tempImage.absolutePath)
         if(keyword in text) {
-            keywordFound = true
+            println("Keyword: $keyword found in: $pdfPath" )
+            break
         }
-        tempImage.delete() // Delete temporary file
     }
-
     doc.close()
-    if(keywordFound) {
-        println("Keyword '$keyword' found in: $pdfPath")
-    }
 }
 
 fun runTess(imagePath: String): String {
@@ -41,22 +37,22 @@ fun runTess(imagePath: String): String {
             processBuilder.redirectErrorStream(true)
 
             val process = processBuilder.start()
-            if(!process.waitFor(1, TimeUnit.MINUTES)) {
+            if(!process.waitFor(10, TimeUnit.SECONDS)) {
                 process.destroy()
                 throw RuntimeException("Process timeout: OCR process was terminated due to exceeding time limit")
             }
             process.inputStream.bufferedReader().readText()
         } catch(e: IOException) {
-            e.printStackTrace()
+//            e.printStackTrace()
             "Error processing image with Tesseract"
         } catch(e: InterruptedException) {
-            e.printStackTrace()
-            "Error processing image with Tesseract"
+//            e.printStackTrace()
+            "Page timeout reached, skipping..."
         }
     }
 
     try {
-        return future.get(1, TimeUnit.MINUTES)
+        return future.get(10, TimeUnit.SECONDS)
     } catch(e: Exception) {
         future.cancel(true)
         return "OCR process canceled due to timeout"
