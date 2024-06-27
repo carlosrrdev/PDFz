@@ -18,9 +18,10 @@ fun extractTextFromPDF(pdfPath: String, keyword: String) {
         val image = renderer.renderImageWithDPI(i, 300F)
         val tempImage = File("page$i.png")
         ImageIO.write(image, "PNG", tempImage)
-        tempImage.delete() // Delete temporary file
 
         val text = runTess(tempImage.absolutePath)
+        tempImage.delete() // Delete temporary file
+
         if(keyword in text) {
             println("Keyword: $keyword found in: $pdfPath" )
             break
@@ -77,5 +78,12 @@ fun main() {
     println("Enter the keyword to search for in the PDF files:")
     val keyword = readlnOrNull() ?: return println("No input provided for keyword.")
 
-    processDirectory(directoryPath, keyword)
+    val spinner = Spinner("Processing PDFS")
+    spinner.start()
+
+    try {
+        processDirectory(directoryPath, keyword)
+    } finally {
+        spinner.stop()
+    }
 }
